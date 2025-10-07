@@ -1,41 +1,31 @@
-# Use official PHP image with Apache
+# Use the official PHP image with Apache
 FROM php:8.2-apache
 
-# Install system dependencies and PHP extensions
+# Install required system dependencies
 RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libzip-dev \
-    zip \
-    git \
-    unzip \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install gd pdo pdo_mysql zip
-
-# Enable Apache mod_rewrite (required for Laravel)
-RUN a2enmod rewrite
+    git unzip libzip-dev zip && \
+    docker-php-ext-install pdo pdo_mysql zip && \
+    a2enmod rewrite
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy project files into the container
+# Copy existing application code
 COPY . .
 
+# Copy example environment (so artisan won’t fail if .env is missing)
+RUN cp .env.example .env
+
 # Install Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN curl -sS https://getcomposer.org/installer | php
+RUN php composer.phar install --no-dev --optimize-autoloader
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# (Remove or comment out this line to avoid build failure)
+# RUN php artisan key:generate
 
-# Generate Laravel app key
-RUN php artisan key:generate
-
-# Set proper permissions for Laravel storage and cache
+# Give Apache permissions to Laravel directories
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
 
-# Expose port 80
+# Expose port 80 and start Apache
 EXPOSE 80
-
-# Start Apache web server
 CMD ["apache2-foreground"]
